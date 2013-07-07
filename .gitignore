@@ -1,2 +1,14 @@
 *.pyc
 *.class
+
+# Data files
+*.fits
+*.csv
+*.dat
+
+#Output files
+*.eps
+*.png
+
+#Temporary emacs files
+*~
