@@ -54,11 +54,8 @@ alpha=alphaFWHM[12][0]
 fwhmPxW= {'PSW':alphaFWHM[12][1], 'PMW': alphaFWHM[12][2], 'PLW': alphaFWHM[12][3]}
 extent = 5.0 #number of beam-widths to apply source to
 
-# Do you want to set the pixel size
-manPix = True
-if manPix:
-	# Set pixel size
-	pixsize = {'PSW':6, 'PMW':10, 'PLW':14}
+# Do you want to set the pixel size. Yes!
+pixsize = {'PSW':6, 'PMW':10, 'PLW':14}
 
 # calculate sigma of gaussian
 sigmaPxW = {}
@@ -164,14 +161,10 @@ for pdtref in scans.refs:
 
 scanConCal=ScanContext(scansout)
 
-if manPix:
-	PSWmap = naiveScanMapper(scanConCal, array='PSW', resolution = pixsize['PSW'])
-	PMWmap = naiveScanMapper(scanConCal, array='PMW',resolution = pixsize['PMW'])
-	PLWmap = naiveScanMapper(scanConCal, array='PLW',resolution = pixsize['PLW'])
-else:
-	PSWmap = naiveScanMapper(scanConCal, array='PSW')
-	PMWmap = naiveScanMapper(scanConCal, array='PMW')
-	PLWmap = naiveScanMapper(scanConCal, array='PLW')
+#Make maps
+PSWmap = naiveScanMapper(scanConCal, array='PSW', resolution = pixsize['PSW'])
+PMWmap = naiveScanMapper(scanConCal, array='PMW',resolution = pixsize['PMW'])
+PLWmap = naiveScanMapper(scanConCal, array='PLW',resolution = pixsize['PLW'])
 
 # for PSW
 meta = PSWmap.getMeta()
