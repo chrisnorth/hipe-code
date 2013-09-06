@@ -67,7 +67,7 @@ sigmaPxW['PMW'] = fwhmPxW['PMW'] / (2.0 * math.sqrt(2.0*math.log(2.0)) * 60.0 * 
 sigmaPxW['PLW'] = fwhmPxW['PLW'] / (2.0 * math.sqrt(2.0*math.log(2.0)) * 60.0 * 60.0)
 
 # calculate integral of gaussian
-lengthPxw = {}
+lengthPxW = {}
 lengthPxW['PSW'] = extent * fwhmPxW['PSW'] / (2.0*60.0*60.0)
 lengthPxW['PMW'] = extent * fwhmPxW['PMW'] / (2.0*60.0*60.0)
 lengthPxW['PLW'] = extent * fwhmPxW['PLW'] / (2.0*60.0*60.0)
@@ -131,11 +131,11 @@ for pdtref in scans.refs:
 		if bolo[3:4] == "T" or bolo[3:5] == "DP" or bolo[3:4] == "R":
 			continue
 				
-		if bolo.find('PSW'):
+		if bolo.find('PSW')>=0:
 			band='PSW'
-		else if bolo.find('PMW'):
+		elif bolo.find('PMW')>=0:
 			band='PMW'
-		else if bolo.find('PLW'):
+		elif bolo.find('PLW')>=0:
 			band='PLW'
 
 		FWHM=fwhmPxW[band]
