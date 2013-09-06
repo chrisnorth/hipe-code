@@ -20,6 +20,7 @@ pool = HttpClientPool ("http://wakefield.bnsc.rl.ac.uk/hcss/pal", "ops")
 pools   = [pool,pool]
 outDir     = "/home/astrog82/spxcen/Herschel/Calibration/ArtificialSources"
 
+
 fits=FitsArchive()
 
 ###########################################################################
