@@ -15,9 +15,10 @@ from os.path import join as pj
 #obsid = 0x5001301E #Neptune shadow obs 1
 #obsid = 0x5001301F] #Neptune shadow obs 2
 obsid = 0x500060E6   #HeVICS V3
+objName='HeViCS_v3'
 pool = HttpClientPool ("http://wakefield.bnsc.rl.ac.uk/hcss/pal", "ops")
 pools   = [pool,pool]
-outDir     = "/home/astrog82/spxcen/Herschel/Calibration/RelGains"
+outDir     = "/home/astrog82/spxcen/Herschel/Calibration/ArtificialSources"
 
 fits=FitsArchive()
 
@@ -25,8 +26,32 @@ fits=FitsArchive()
 #### Set source options ####
 ########################################################################### 
 # Select input peak in Jy/Beam
-peak = 0.5
-FWHM = 60.0 #peak width in arcsec (maybe?)
+peak = 1.0
+
+alphaFWHM= [[-4.0 , 17.0964582 , 23.2158027 , 33.4193693 ], \
+	[-3.5 , 17.1587462 , 23.2954734 , 33.6264675  ], \
+	[-3.0 , 17.2210894 , 23.3765151 , 33.8366761  ], \
+	[-2.5 , 17.2839022 , 23.458792 , 34.0493927  ], \
+	[-2.0 , 17.3473485 , 23.5421564 , 34.2639343  ], \
+	[-1.5 , 17.4114569 , 23.6264504 , 34.4795555  ], \
+	[-1.0 , 17.4761811 , 23.7115072 , 34.695467  ], \
+	[-0.5 , 17.5414331 , 23.7971529 , 34.9108563  ], \
+	[0.0 , 17.6071016 , 23.8832086 , 35.1249068  ], \
+	[0.5 , 17.6730623 , 23.9694922 , 35.3368182  ], \
+	[1.0 , 17.7391841 , 24.0558209 , 35.5458238  ], \
+	[1.5 , 17.8053334 , 24.1420136 , 35.7512068  ], \
+	[2.0 , 17.8713775 , 24.227893 , 35.9523134  ], \
+	[2.5 , 17.937186 , 24.313288 , 36.1485637  ], \
+	[3.0 , 18.0026338 , 24.3980365 , 36.3394589  ], \
+	[3.5 , 18.0676021 , 24.4819875 , 36.5245852  ], \
+	[4.0 , 18.1319799 , 24.5650037 , 36.7036159  ], \
+	[4.5 , 18.1956657 , 24.6469637 , 36.8763098  ], \
+	[5.0 , 18.2585678 , 24.7277653 , 37.0425076  ]]
+
+print alphaFWHM[0]
+
+alpha=alphaFWHM[12][0]
+fwhmPxW= {'PSW':alphaFWHM[12][1], 'PMW': alphaFWHM[12][2], 'PLW': alphaFWHM[12][3]}
 extent = 5.0 #number of beam-widths to apply source to
 
 # Do you want to set the pixel size
@@ -36,13 +61,23 @@ if manPix:
 	pixsize = {'PSW':6, 'PMW':10, 'PLW':14}
 
 # calculate sigma of gaussian
-sigma = FWHM / (2.0 * math.sqrt(2.0*math.log(2.0)) * 60.0 * 60.0)
+sigmaPxW = {}
+sigmaPxW['PSW'] = fwhmPxW['PSW'] / (2.0 * math.sqrt(2.0*math.log(2.0)) * 60.0 * 60.0)
+sigmaPxW['PMW'] = fwhmPxW['PMW'] / (2.0 * math.sqrt(2.0*math.log(2.0)) * 60.0 * 60.0)
+sigmaPxW['PLW'] = fwhmPxW['PLW'] / (2.0 * math.sqrt(2.0*math.log(2.0)) * 60.0 * 60.0)
 
 # calculate integral of gaussian
-length  = extent * FWHM / (2.0*60.0*60.0)
+lengthPxw = {}
+lengthPxW['PSW'] = extent * fwhmPxW['PSW'] / (2.0*60.0*60.0)
+lengthPxW['PMW'] = extent * fwhmPxW['PMW'] / (2.0*60.0*60.0)
+lengthPxW['PLW'] = extent * fwhmPxW['PLW'] / (2.0*60.0*60.0)
 #integral = 2.0 * peak * math.pi * sigma**2.0 * (1.0 - math.exp(-length**2.0/(2.0*sigma**2.0)))
 #integral = integral / (math.pi * length**2.0)
-step = length/100.0
+stepPxW={}
+stepPxW['PSw'] = lengthPxW['PSW']/100.0
+stepPxW['PMw'] = lengthPxW['PMW']/100.0
+stepPxW['PLw'] = lengthPxW['PLW']/100.0
+
 sum = 0.0
 #for j in range(-2000,2001):
 #	for i in range(-2000,2001):
@@ -84,7 +119,6 @@ for pdtref in scans.refs:
 	bolometers=pdt.getChannelNames()
 	
 	for bolo in bolometers:
-
 		# if first time then calculate where the centre is best
 		if first:
 			# create centre
@@ -97,6 +131,16 @@ for pdtref in scans.refs:
 		if bolo[3:4] == "T" or bolo[3:5] == "DP" or bolo[3:4] == "R":
 			continue
 				
+		if bolo.find('PSW'):
+			band='PSW'
+		else if bolo.find('PMW'):
+			band='PMW'
+		else if bolo.find('PLW'):
+			band='PLW'
+
+		FWHM=fwhmPxW[band]
+		sigma=sigmaPxW[band]
+		length=lengthPxW[band]
 		# locate all samples that are in the range required
 		boloRA = pdt.getRa(bolo)
 		boloDEC = pdt.getDec(bolo)
@@ -143,9 +187,9 @@ meta.set('author',StringParameter('C. North (Cardiff) - artificial source insert
 PLWmap.setMeta(meta)
 
 # Save maps
-fits.save(pj(outDir,object+"-PSWmap-src-"+version+".fits"),PSWmap)
-fits.save(pj(outDir,object+"-PMWmap-src-"+version+".fits"),PMWmap)
-fits.save(pj(outDir,object+"-PLWmap-src-"+version+".fits"),PLWmap)
+fits.save(pj(outDir,objName+"_"+obsid+"_PSWmap-src-"+alpha+".fits"),PSWmap)
+fits.save(pj(outDir,objName+"_"+obsid+"_PMWmap-src-"+alpha+".fits"),PMWmap)
+fits.save(pj(outDir,objName+"_"+obsid+"_PLWmap-src-"+alpha+".fits"),PLWmap)
 
 
 
