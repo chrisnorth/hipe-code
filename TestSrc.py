@@ -131,21 +131,21 @@ else:
 
 # for PSW
 meta = PSWmap.getMeta()
-meta.set('author',StringParameter('M.Smith (Cardiff) BriGAdE L1-L2 Pipeline'))
+meta.set('author',StringParameter('C. North (Cardiff) - artificial source insertion'))
 PSWmap.setMeta(meta)
 # for PMW
 meta = PMWmap.getMeta()
-meta.set('author',StringParameter('M.Smith (Cardiff) BriGAdE L1-L2 Pipeline'))
+meta.set('author',StringParameter('C. North (Cardiff) - artificial source insertion'))
 PMWmap.setMeta(meta)
 # for PLW
 meta = PLWmap.getMeta()
-meta.set('author',StringParameter('M.Smith (Cardiff) BriGAdE L1-L2 Pipeline'))
+meta.set('author',StringParameter('C. North (Cardiff) - artificial source insertion'))
 PLWmap.setMeta(meta)
 
 # Save maps
-fits.save(pj(outfolder,object+"-PSWmap-mosaic_MS-"+version+".fits"),PSWmap)
-fits.save(pj(outfolder,object+"-PMWmap-mosaic_MS-"+version+".fits"),PMWmap)
-fits.save(pj(outfolder,object+"-PLWmap-mosaic_MS-"+version+".fits"),PLWmap)
+fits.save(pj(outDir,object+"-PSWmap-src-"+version+".fits"),PSWmap)
+fits.save(pj(outDir,object+"-PMWmap-src-"+version+".fits"),PMWmap)
+fits.save(pj(outDir,object+"-PLWmap-src-"+version+".fits"),PLWmap)
 
 
 
