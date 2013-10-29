@@ -13,6 +13,7 @@ from herschel.share.unit import Angle
 from herschel.share.unit import SolidAngle
 
 import math
+import urllib
 import os
 from os.path import join as pj
 import sys
@@ -61,10 +62,14 @@ doMap=True #make maps of sources
 ##Bands to use
 bands=['PSW','PMW','PLW']
 
+##Neptune spectral index
+alphaNep={'PSW':1.29,'PMW':1.42,'PLW':1.47}
+
 ##source spectral index (scalar or range)
 #alphaArr=Float1d([-1.0])
 #alphaArr=Float1d.range(19).divide(2).subtract(4) #[-4 to +5 with 0.5 spacing]
-alphaArr=Float1d.range(10).subtract(4) #[-4 to +5 with 1.0 spacing]
+#alphaArr=Float1d.range(10).subtract(4) #[-4 to +5 with 1.0 spacing]
+alphaArr=[]
 
 ##source grey body temperatures and emissivity spectral indices
 ##effective beam calculated for each temperature and beta
@@ -85,7 +90,7 @@ userSpec=[]
 #########################################
 
 ##max radius of beam (arcsec)
-maxRad=600
+maxRad=700
 
 ##beam spectral variation
 ##beam width scales as nu^gamma
@@ -98,6 +103,10 @@ nuEff={'PSW':1217.27,'PMW':867.75,'PLW':610.87}
 apCorr={'PSW':{'aperture':22.,'inner':60.,'outer':90.},
 	'PMW':{'aperture':30.,'inner':60.,'outer':90.},
 	'PLW':{'aperture':45.,'inner':60.,'outer':90.}}
+
+#Working directory
+workDir = Configuration.getProperty('var.hcss.workdir')
+
 #########################################
 ########### Useful functions ############
 #########################################
@@ -149,13 +158,32 @@ for band in bands:
 
 	##READ FROM ASCII FILES
 	## input path for files
-	inpPath='/data/Herschel/Calibration/Inputs/'
-	if inpPath[-1] != '/': 	inpPath=inpPath+'/'
+	#inpPath='/data/Herschel/Calibration/Inputs/'
+	#if inpPath[-1] != '/': 	inpPath=inpPath+'/'
+
 	#files assumed to be named PxW_Core.csv , PxW_Constant.csv
-	fileCore=inpPath+band+'_Core.csv'
-	fileConst=inpPath+band+'_Constant.csv'
-	beamCore=asciiTableReader(file=fileCore, tableType='CSV')['c0'].data[0:maxRad]
-	beamConst=asciiTableReader(file=fileConst, tableType='CSV')['c0'].data[0:maxRad]
+	fileCore=band+'_Core.csv'
+	fileConst=band+'_Constant.csv'
+	try:
+		#try to import Core
+		beamCore=asciiTableReader(file=ps.path.join(workDir,fileCore), tableType='CSV')['c0'].data[0:maxRad]
+	except:
+		#download from web and import
+		urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+fileCore,\
+		    os.path.join(workDir,fileCore))
+		beamCore=asciiTableReader(file=os.path.join(workDir,fileCore), tableType='CSV')['c0'].data[0:maxRad]
+	#
+	try:
+		#try to import Core
+		beamConst=asciiTableReader(file=ps.path.join(workDir,fileCore), tableType='CSV')['c0'].data[0:maxRad]
+	except:
+		#download from web and import
+		urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+fileConst,\
+		    os.path.join(workDir,fileConst))
+		beamConst=asciiTableReader(file=os.path.join(workDir,fileConst), tableType='CSV')['c0'].data[0:maxRad]
+
+	#beamCore=asciiTableReader(file=os.path.join(inpPath,fileCore), tableType='CSV')['c0'].data[0:maxRad]
+	#beamConst=asciiTableReader(file=os.path.join(inpPath,fileConst), tableType='CSV')['c0'].data[0:maxRad]
 
 	##HARDCODE BEAM PROFILES (IF ASCII READING NOT WORKING)
 	#if band=='PSW':
@@ -189,7 +217,8 @@ for band in bands:
 
 if doCheck:
 	print "Checking..."
-	fileNorm='/data/Herschel/Calibration/Beam_plots/EffBeams/Unnorm_areas.csv'
+	#fileNorm='/data/Herschel/Calibration/Beam_plots/EffBeams/Unnorm_areas.csv'
+	fileNorm=os.path.join(workDir,'Unnorm_areas.csv')
 	chkArea={'radius':asciiTableReader(file=fileNorm, tableType='CSV')['radius'].data[0:maxRad],
 		'PSW':asciiTableReader(file=fileNorm, tableType='CSV')['PSW'].data[0:maxRad],
 		'PMW':asciiTableReader(file=fileNorm, tableType='CSV')['PMW'].data[0:maxRad],
@@ -268,7 +297,34 @@ if doCheck:
 
 ##Create beam objects in main dictionary
 effBeams={}
-bx=1
+bx=0
+
+##Neptune beam
+n='%d-PL_Nep'%bx
+print 'name',n
+effBeams[n]={'type':'Neptune','alpha':alphaNep,
+	'radius':beamsIn['radius'],'nrad':beamsIn['nrad'],'radUnit':beamsIn['radUnit']}
+effBeams[n]['freq']=rsrf.getFrequency()
+effBeams[n]['freqUnit']=rsrf.getFrequencyUnit()
+effBeams[n]['srcSpec']=Double1d(len(effBeams[n]['freq']))
+effBeams[n]['bNum']=Double1d(len(effBeams[n]['freq']))
+bandLim={'PSW':[1020.,1600.],'PMW':[735.,1020.],'PLW':[400.,735.],'freqUnit':Frequency.GIGAHERTZ}
+bandNum={'PSW':1.,'PMW':2.,'PLW':3.}
+for f in range(len(effBeams[n]['freq'])):
+	for band in bands:
+		if (effBeams[n]['freq'][f] <= bandLim[band][1]) and (effBeams[n]['freq'][f] > bandLim[band][0]):
+			effBeams[n]['srcSpec'][f]=(effBeams[n]['freq'][f]/nuEff['PMW'])**alphaNep[band]
+			effBeams[n]['bNum'][f]=bandNum[band]
+bx+=1
+
+if doCheck:
+	pnep=PlotXY()
+	pnep.addLayer(LayerXY(Double1d(effBeams[n]['freq']),Double1d(effBeams[n]['srcSpec'])))
+	for band in bands:
+		pnep.addLayer(LayerXY(Double1d(effBeams[n]['freq']),Double1d(rsrf.getRsrf(band))))
+		pnep.addLayer(LayerXY(Double1d([bandLim[band][0],bandLim[band][0]]),Double1d([0,3])))
+		pnep.addLayer(LayerXY(Double1d([bandLim[band][1],bandLim[band][1]]),Double1d([0,3])))
+
 for a in alphaArr:
 	#name of beam object
 	n='%d-PL_%.4f'%(bx,a)
@@ -509,29 +565,92 @@ if doApCorr:
 		pAp2.addLayer(LayerXY(chkApCorr['alpha'],BSApCorr_BG[:,2],name='PLW (BS)'))
 
 if doMap:
-	import urllib, os
 	workDir = Configuration.getProperty('var.hcss.workdir')
-	bcenter = {'PSW':(700,699), 'PMW':(700,700), 'PLW':(698,700)} # Positions of peak pixel
+	#bcenter = {'PSW':(700,700), 'PMW':(700,700), 'PLW':(700,700)} # Positions of peak pixel
+	bcenter = [700,700]
+	bcenterFull = {'PSW':(1118,965), 'PMW':(700,700), 'PLW':(698,700)} # Positions of peak pixel
+	doneRad=False
 	for band in bands:
-		beamName = "0x5000241aL_%s_pmcorr_1arcsec_norm_beam.fits"%band
+#		beamNameFull = "0x5000241aL_%s_pmcorr_1arcsec_cln_bgsub.fits"%band
+#		beamNameNorm = "0x5000241aL_%s_pmcorr_1arcsec_norm_beam.fits"%band
+#		##Read in measured beam
+#		try:
+#			beamsIn[band]['mapIn'] = fitsReader(file = os.path.join(workDir,beamNameFull))
+#		except:
+#			urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamNameFull,\
+#			    os.path.join(workDir,beamNameFull))
+#			beamsIn[band]['mapIn'] = fitsReader(file = os.path.join(workDir,beamNameFull))
+#		beamsIn[band]['mapIn']['image'].data[beamsIn[band]['mapIn']['image'].data.where(beamsIn[band]['mapIn']['image'].data != beamsIn[band]['mapIn']['image'].data)] = 0
+
+		##Read in synthesised beam
 		try:
-			beamsIn[band]['mapIn'] = fitsReader(file = os.path.join(workDir,beamName))
+			beamsIn[band]['mapSynth'] = fitsReader(file = os.path.join(workDir,beamNameNorm))
 		except:
-			urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamName,\
-			    os.path.join(workDir,beamName))
-			beamsIn[band]['mapIn'] = fitsReader(file = os.path.join(workDir,beamName))
-		beamsIn[band]['mapSynth'] = beamsIn[band]['mapIn'].copy()
+			urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamNameNorm,\
+			    os.path.join(workDir,beamNameNorm))
+			beamsIn[band]['mapSynth'] = fitsReader(file = os.path.join(workDir,beamNameNorm))
+			beamsIn[band]['mapSynth'].setUnit('Jy/beam')
+
 		beamsIn[band]['mapSynth']['image'].data[:,:]=0.
-		beamsIn[band]['beamRad'] = beamsIn[band]['mapIn']['image'].data.copy()
-		nx=beamsIn[band]['beamRad'][0,:].size
-		ny=beamsIn[band]['beamRad'][:,0].size
+
+#		##make radius array for full beam
+#		beamsIn[band]['beamRadFull'] = beamsIn[band]['mapIn']['image'].data.copy()
+#		nxF=beamsIn[band]['beamRadFull'][:,0].size
+#		nyF=beamsIn[band]['beamRadFull'][0,:].size
+#		for x in range(nxF):
+#			for y in range(nyF):
+#				beamsIn[band]['beamRadFull'][x,y]= \
+#				    math.sqrt((x-bcenterFull[band][0])**2 + (y-bcenterFull[band][1])**2)
+#
+#		##calculate area for input beam
+#		beamsIn[band]['mapInArea']=sum(beamsIn[band]['mapIn']['image'].data[ \
+#		   beamsIn[band]['beamRadFull'].where( beamsIn[band]['beamRadFull'] <= maxRad-1)])
+#		print 'mapIn area %s: %.2f'%(band,beamsIn[band]['mapInArea'])
+
+		if not doneRad:
+			##make radius array for synthesised beams
+			beamsIn['mapRad'] = beamsIn[band]['mapSynth']['image'].data.copy()
+			nx=beamsIn['mapRad'][:,0].size
+			ny=beamsIn['mapRad'][0,:].size
+			for x in range(nx):
+				for y in range(ny):
+					beamsIn['mapRad'][x,y]= \
+					    math.sqrt((x-bcenter[0])**2 + (y-bcenter[1])**2)
+			doneRad=True
+
 		beamInt=LinearInterpolator(beamsIn['radius'],beamsIn[band]['Comb'])
 		for x in range(nx):
 			for y in range(ny):
-				beamsIn[band]['beamRad'][x,y]= \
-				    math.sqrt((x-bcenter[band][0])**2 + (y-bcenter[band][1])**2)
-				if beamsIn[band]['beamRad'][x,y] <= maxRad-1:
-					#print x,y,beamsIn[band]['beamRad'][x,y]
+				if beamsIn['mapRad'][x,y] <= maxRad-1:
 					beamsIn[band]['mapSynth']['image'].data[x,y]= \
-					    beamInt(beamsIn[band]['beamRad'][x,y])
+					    beamInt(beamsIn['mapRad'][x,y])
+		##calculate area for synthesised beam
+		beamsIn[band]['mapSynthArea']=sum(beamsIn[band]['mapSynth']['image'].data[ \
+		   beamsIn['mapRad'].where( beamsIn['mapRad'] <= maxRad-1)])
+		print 'mapSynth area %s: %.2f'%(band,beamsIn[band]['mapSynthArea'])
 
+	for n in effBeams:
+		for band in bands:
+			effBeams[n][band]['mapSynth']=beamsIn[band]['mapSynth'].copy()
+			effBeams[n][band]['mapSynth']['image'].data[:,:]=0
+			effBeams[n]['mapRad'] = beamsIn['mapRad'].copy()
+			nx=effBeams[n]['mapRad'][:,0].size
+			ny=effBeams[n]['mapRad'][0,:].size
+			beamInt=LinearInterpolator(effBeams[n]['radius'],effBeams[n][band]['Comb'])
+			for x in range(nx):
+				for y in range(ny):
+					if effBeams[n]['mapRad'][x,y] <= maxRad-1:
+						#print x,y,beamsIn[band]['beamRad'][x,y]
+						effBeams[n][band]['mapSynth']['image'].data[x,y]= \
+						    beamInt(effBeams[n]['mapRad'][x,y])
+			##calcualte area
+			effBeams[n][band]['mapArea']=sum(effBeams[n][band]['mapSynth']['image'].data[ \
+			   effBeams[n]['mapRad'].where(effBeams[n]['mapRad'] <= maxRad-1)])
+			#make beam map in Jy/pixel (not Jy/beam)
+			effBeams[n][band]['mapExt']=convertImageUnit(effBeams[n][band]['mapSynth'], \
+			   newUnit='Jy/pixel', beamArea=effBeams[n][band]['mapArea'])
+
+	for n in effBeams:
+		for band in bands:	
+			print '%s %s beam area (sq. arcsec): [Map, Profile, Rel. diff]: %.2f, %.2f, %.4f'% \
+			   (n,band,effBeams[n][band]['mapArea'], effBeams[n][band]['Area'],1.-effBeams[n][band]['mapArea']/effBeams[n][band]['Area'])
