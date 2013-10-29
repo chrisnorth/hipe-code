@@ -589,8 +589,8 @@ if doMap:
 			urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamNameNorm,\
 			    os.path.join(workDir,beamNameNorm))
 			beamsIn[band]['mapSynth'] = fitsReader(file = os.path.join(workDir,beamNameNorm))
-			beamsIn[band]['mapSynth'].setUnit('Jy/beam')
 
+		beamsIn[band]['mapSynth'].setUnit('Jy/beam')
 		beamsIn[band]['mapSynth']['image'].data[:,:]=0.
 
 #		##make radius array for full beam
