@@ -14,7 +14,10 @@
 ######################### Import data #########################
 
 # Loading an observation of Gamma Dra from the HSA and its level1
-#obs    = getObservation(1342195871, useHsa=1)
+try:
+	obs
+except:
+	obs    = getObservation(1342195871, useHsa=1)
 mapPsw = obs.level2.refs["psrcPSW"].product
 mapPmw = obs.level2.refs["psrcPMW"].product
 mapPlw = obs.level2.refs["psrcPLW"].product
@@ -30,7 +33,10 @@ alpha  = 2.0
 arrays = ['PSW','PMW','PLW']
 #import cal from working directory
 import os
-cal = spireCal(jarFile=os.path.join(Configuration.getProperty('var.hcss.workdir'),'spire_cal_12_0.jar'))
+try:
+	cal
+except:
+	cal = spireCal(jarFile=os.path.join(Configuration.getProperty('var.hcss.workdir'),'spire_cal_12_0.jar'))
 #cal    = spireCal(pool='spire_cal_12_0')
 
 beamCorrTable  = cal.phot.refs["ColorCorrBeam"].product
@@ -38,8 +44,8 @@ aperCorrTable  = cal.phot.colorCorrApertureList.refs[0].product
 kCorrPsrcTable = cal.phot.colorCorrKList.refs[0].product
 kCorrExtdTable = cal.phot.colorCorrKList.refs[1].product
 
-#fwhm      = [18.2, 24.9, 36.9]
-fwhm      = [17.0, 23.9, 35.2] #geometric mean
+fwhm      = [18.2, 24.9, 36.9]
+#fwhm      = [17.0, 23.9, 35.2] #geometric mean
 peak      = [22, 30, 42]
 beamArea  = [beamCorrTable.meta['beamPswArc'].double,\
 	beamCorrTable.meta['beamPmwArc'].double, \
