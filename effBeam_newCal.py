@@ -90,7 +90,7 @@ userSpec=[]
 #########################################
 
 ##max radius of beam (arcsec)
-maxRad=700
+maxRad=600
 
 ##beam spectral variation
 ##beam width scales as nu^gamma
@@ -147,11 +147,32 @@ rsrf=cal.phot.getRsrf()
 ##Create beam object
 beamsIn={'type':'Measured'}
 
+
 ##create Radius array (will eventually be read from cal products)
 radArr=Double1d.range(maxRad)
 beamsIn['radius']=radArr
 beamsIn['nrad']=len(radArr)
 beamsIn['radUnit']=Angle.SECONDS_ARC
+
+fileSCalBeam='SCalPhotRadialCorrBeam_v1.fits'
+try:
+	beamInSCal=fitsReader(file=os.path.join(workDir,fileSCalBeam))
+except:
+	urllib.urlretrieve ("ftp://www.spire.rl.ac.uk/newCalTree/"+fileSCalBeam,\
+		    os.path.join(workDir,fileSCalBeam))
+	beamInSCal=fitsReader(file=os.path.join(workDir,fileSCalBeam))
+
+beamsSCal={'type':'Measured'}
+beamsSCal['radius']=beamInSCal['core']['radius'].data
+beamsSCal['nrad']=len(beamsSCal['radius'])
+beamsSCal['radUnit']=Angle.SECONDS_ARC
+maxRadSCal=beamsSCal['nrad']
+
+for band in bands:
+	beamsSCal[band]={}
+	beamsSCal[band]['Core']=beamInSCal['core'][band].data
+	beamsSCal[band]['Constant']=beamInSCal['constant'][band].data
+	beamsSCal[band]['AreaCumulNorm']=beamInSCal['normArea'][band].data
 for band in bands:
 
 	##These will eventually be read from cal products
@@ -164,6 +185,7 @@ for band in bands:
 	#files assumed to be named PxW_Core.csv , PxW_Constant.csv
 	fileCore=band+'_Core.csv'
 	fileConst=band+'_Constant.csv'
+
 	try:
 		#try to import Core
 		beamCore=asciiTableReader(file=ps.path.join(workDir,fileCore), tableType='CSV')['c0'].data[0:maxRad]
@@ -215,10 +237,32 @@ for band in bands:
 	#add to main dict for input beams
 	beamsIn[band]={'Core':beamCore,'Const':beamConst,'Comb':beamComb,'Area':beamArea,'AreaCumul':areaCumul}
 
-sadfs
+	##repeat for beams from SCal
+	beamCombSCal=Double1d(beamsSCal['nrad'])
+	areaArgArrSCal=Double1d(beamsSCal['nrad'])
+	for r in range(maxRadSCal):
+		beamCombSCal[r]=max(beamsSCal[band]['Core'][r],beamsSCal[band]['Constant'][r])
+		areaArgArr[r]=beamCombSCal[r] * 2.*math.pi*beamsSCal['radius'][r]
+	##calculate input beam area from profile
+	areaArgSCal=LinearInterpolator(beamsSCal['radius'],areaArgArrSCal)
+	areaIntSCal=TrapezoidalIntegrator(0,maxRadSCal-1)
+	beamAreaSCal=areaIntSCal.integrate(areaArgSCal)
+	areaCumulSCal=Double1d(maxRadSCal)
+	#calculate cumulative beam area as function of radius
+	for r in range(maxRadSCal):
+		areaCumulIntSCal=TrapezoidalIntegrator(0,beamsSCal['radius'][r])
+		areaCumulSCal[r]=areaCumulIntSCal.integrate(areaArgSCal)
+
+	#add to main dict for input beams
+	beamsSCal[band]['Comb']=beamCombSCal
+	beamsSCal[band]['Area']=beamAreaSCal
+	beamsSCal[band]['AreaCumul']=areaCumulSCal
+
+asdfasdf
 
 if doCheck:
 	print "Checking..."
+	
 	#fileNorm='/data/Herschel/Calibration/Beam_plots/EffBeams/Unnorm_areas.csv'
 	fileNorm=os.path.join(workDir,'Unnorm_areas.csv')
 	chkArea={'radius':asciiTableReader(file=fileNorm, tableType='CSV')['radius'].data[0:maxRad],
