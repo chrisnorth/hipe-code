@@ -44,9 +44,10 @@ aperCorrTable  = cal.phot.colorCorrApertureList.refs[0].product
 kCorrPsrcTable = cal.phot.colorCorrKList.refs[0].product
 kCorrExtdTable = cal.phot.colorCorrKList.refs[1].product
 
-fwhm      = [18.2, 24.9, 36.9]
-#fwhm      = [17.0, 23.9, 35.2] #geometric mean
+#fwhm      = [18.2, 24.9, 36.9]
+fwhm      = [17.0, 23.9, 35.2] #geometric mean
 peak      = [22, 30, 42]
+kPtoE    = [90.681, 51.432, 23.908]
 beamArea  = [beamCorrTable.meta['beamPswArc'].double,\
 	beamCorrTable.meta['beamPmwArc'].double, \
 	beamCorrTable.meta['beamPlwArc'].double]
@@ -74,13 +75,17 @@ srcSussex = sourceExtractorSussextractor(image=mapPsw, detThreshold=5.0, fwhm=fw
 srcSussex['sources']['flux'].data = srcSussex['sources']['flux'].data * kCorrPsrc[0]
 
 
+mapPsrc2 = obs.level2.refs["extdPSW"].product
+mapPsrc2["image"].data = mapPsrc2["image"].data / kPtoE[0]
+mapPsrc2.setUnit('Jy/beam')
+
 #################### Running DAOphot on PSW ####################
 
 # By default since HIPE 9, results are already corrected for aperture correction
-srcDao = sourceExtractorDaophot(image=mapPsw, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamArea[0])
-srcDaoCorr = sourceExtractorDaophot(image=mapPsw, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamAreaCorr[0])
-srcDaoNoAp = sourceExtractorDaophot(image=mapPsw, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamArea[0],doApertureCorrection=False)
-srcDaoCorrNoAp = sourceExtractorDaophot(image=mapPsw, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamAreaCorr[0],doApertureCorrection=False)
+srcDao = sourceExtractorDaophot(image=mapPsrc2, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamArea[0])
+srcDaoCorr = sourceExtractorDaophot(image=mapPsrc2, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamAreaCorr[0])
+srcDaoNoAp = sourceExtractorDaophot(image=mapPsrc2, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamArea[0],doApertureCorrection=False)
+srcDaoCorrNoAp = sourceExtractorDaophot(image=mapPsrc2, detThreshold=5.0, fwhm=fwhm[0], beamArea=beamAreaCorr[0],doApertureCorrection=False)
 
 # Colour correcting results for a source with alpha = +2.0 (default being -1)
 srcDao['sources']['flux'].data = srcDao['sources']['flux'].data * kCorrPsrc[0] * beamCorr[0]
@@ -103,12 +108,15 @@ srcTimeline['sources']['flux'].data = srcTimeline['sources']['flux'].data * kCor
 # First, convert the map to Jy/pixel dividing by the pipeline beam area 
 mapPsrc = convertImageUnit(image=mapPsw, newUnit='Jy/pixel', beamArea=beamArea[0])
 
+mapPsrc2Ext = convertImageUnit(image=mapPsrc2, newUnit='Jy/pixel', beamArea=beamArea[0])
 # Select/highlight mapPsrc in the "Variables" view and then double click on
 # "annularSkyAperturePhotometry" under "Applicable" in the "Tasks" view.
 # Click on the central source, select "Centroiding", select some values for the radii
 # (e.g. 22, 60, 90" for PSW) and then run the task. This is equivalent to running the following line
 # (centerX and centerY will change depending on where you clicked with the mouse!):
 resultPsrc = annularSkyAperturePhotometry(image=mapPsrc, centerX=91, centerY=104,\
+	centroid=True, fractional=1, radiusArcsec=peak[0], innerArcsec=60.0, outerArcsec=90.0)
+resultPsrc2 = annularSkyAperturePhotometry(image=mapPsrc2Ext, centerX=91, centerY=104,\
 	centroid=True, fractional=1, radiusArcsec=peak[0], innerArcsec=60.0, outerArcsec=90.0)
 #
 ## Alternatively, you can also specify a [RA, Dec] position,
@@ -124,7 +132,9 @@ print 'Source flux (in mJy) for PSW array is: %f +/- %f'%(\
 	resultPsrc['Results table'][0].data[2] * 1.e3 * aperCorr[0] * kCorrPsrc[0] * beamCorr[0],\
 	resultPsrc['Results table'][3].data[2] * 1.e3 * aperCorr[0] * kCorrPsrc[0] * beamCorr[0])
 
-
+print 'Source flux 2 (in mJy) for PSW array is: %f +/- %f'%(\
+	resultPsrc2['Results table'][0].data[2] * 1.e3 * aperCorr[0] * kCorrPsrc[0] * beamCorr[0],\
+	resultPsrc2['Results table'][3].data[2] * 1.e3 * aperCorr[0] * kCorrPsrc[0] * beamCorr[0])
 ############# Comparison with aperture photometry ##############
 ####### starting from extended emission calibrated maps ########
 
@@ -166,15 +176,15 @@ print 'Sussextractor flux (in mJy): %.4f +/- %.4f'%(\
 	srcSussex['sources']['flux'].data[0],srcSussex['sources']['fluxPlusErr'].data[0])
 print 'DaoPhot flux (in mJy): %.4f +/- %.4f'%(\
 	srcDao['sources']['flux'].data[0],srcDao['sources']['fluxPlusErr'].data[0])
-print 'DaoPhot flux [no auto apcorr] (in mJy): %.4f +/- %.4f'%(\
-	srcDaoNoAp['sources']['flux'].data[0],srcDaoNoAp['sources']['fluxPlusErr'].data[0])
 print 'DaoPhot flux [corr beam] (in mJy): %.4f +/- %.4f'%(\
 	srcDaoCorr['sources']['flux'].data[0],srcDaoCorr['sources']['fluxPlusErr'].data[0])
+print 'DaoPhot flux [no auto apcorr] (in mJy): %.4f +/- %.4f'%(\
+	srcDaoNoAp['sources']['flux'].data[0],srcDaoNoAp['sources']['fluxPlusErr'].data[0])
 print 'DaoPhot flux [corr beam, no auto apcorr] (in mJy): %.4f +/- %.4f'%(\
 	srcDaoCorrNoAp['sources']['flux'].data[0],srcDaoCorrNoAp['sources']['fluxPlusErr'].data[0])
 print 'ApCorr flux [psrc] (in mJy): %.4f +/- %.4f'%(\
-	resultPsrc['Results table'][0].data[2] * 1.e3 * aperCorr[0] * kCorrPsrc[0] * beamCorr[0],\
-	resultPsrc['Results table'][3].data[2] * 1.e3 * kCorrPsrc[0])
+	resultPsrc2['Results table'][0].data[2] * 1.e3 * aperCorr[0] * kCorrPsrc[0] * beamCorr[0],\
+	resultPsrc2['Results table'][3].data[2] * 1.e3 * kCorrPsrc[0])
 print 'ApCorr flux [extd] (in mJy): %.4f +/- %.4f'%(\
 	resultExtd['Results table'][0].data[2] * 1.e3 * aperCorr[0] * kCorrExtd[0] * beamCorr[0],\
 	resultExtd['Results table'][3].data[2] * 1.e3 * kCorrExtd[0])
